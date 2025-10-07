@@ -41,9 +41,41 @@ def createNode(move, state, depth, node):
     }
     return new_node
 def utility(state): #to be done later along with the unit tests
-    bad = 0
+    worker_part = worker_utility(state)
+    soldier_part = soldier_utility(state)
+    return 140.001-(worker_part+soldier_part)/1.01
+
+def soldier_utility(state):
+    if (len(getAntList(state, state.whoseTurn, (R_SOLDIER,))) > 0):
+        soldier = getAntList(state, state.whoseTurn, (R_SOLDIER,))[0]
+    else:
+        soldier = None
+    if not (soldier == None): #SOLDIER: if a soldier exists and you killed the queen or worker, good
+        my_soldier_part = 10
+        if (len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) < 1) or (len(getAntList(state, 1 - state.whoseTurn, (QUEEN,))) < 1):
+            my_soldier_part += 60.0
+        else: #SOLDIER: go towards the worker but also a bit towards the squeen so it values vertical distance
+            my_soldier_part += max(0, 12-stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (WORKER,))[0].coords)- 0.1 *stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].coords))
+        if (len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) < 1) and (len(getAntList(state, 1 - state.whoseTurn, (QUEEN,))) == 1):
+            my_soldier_part += max(0, 12-stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].coords)) #why
+            #SOLDIER: stay a bit away from the queen
+            #SOLDIER: if you damaged the queen, good
+        if (len(getAntList(state, 1 - state.whoseTurn, (QUEEN,))) == 1):
+            my_soldier_part +=  (5-0.5*getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].health)
+            if (stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].coords) < 3):
+                my_soldier_part = 0
+        else:
+            my_soldier_part += 60
+        for drone in getAntList(state, 1 - state.whoseTurn, (DRONE,)):
+            if stepsToReach(state, soldier.coords, drone.coords) < 2:
+                return -1
+    else:
+        my_soldier_part = 0
+    return my_soldier_part
+
+def worker_utility(state):
+    bad = 99
     worker_part = 0
-    soldier_part = 0
     queen = getAntList(state, state.whoseTurn, (QUEEN,))[0] # get queen
     if (len(getAntList(state, state.whoseTurn, (WORKER,))) > 0):
         worker = getAntList(state, state.whoseTurn, (WORKER,))[0] # get worker
@@ -58,45 +90,18 @@ def utility(state): #to be done later along with the unit tests
         return bad
     else:
          if not (worker.carrying): #WORKER: go to food if not already carrying it
-            worker_part = (10-stepsToReach(state, worker.coords, food[0].coords)) + 35*(state.inventories[state.whoseTurn].foodCount)
+            return 1.0-0.1*stepsToReach(state, worker.coords, food[0].coords) + 4.5*state.inventories[state.whoseTurn].foodCount
          if (worker.carrying): #WORKER: go home if carrying food
-            worker_part = (10-stepsToReach(state, worker.coords, tunnel.coords)) + 10 + 35*(state.inventories[state.whoseTurn].foodCount)
+            return 1.0-0.1*stepsToReach(state, worker.coords, tunnel.coords) + 1.5 + 4.5*state.inventories[state.whoseTurn].foodCount
     anthill = getConstrList(state, state.whoseTurn, (ANTHILL,))[0]
-    if (len(getAntList(state, state.whoseTurn, (R_SOLDIER,))) > 0):
-        soldier = getAntList(state, state.whoseTurn, (R_SOLDIER,))[0]
-    else:
-        soldier = None
     if (queen.coords == anthill.coords): #QUEEN: get off anthill
         return bad
-    if not (soldier == None): #SOLDIER: if a soldier exists and you killed the queen or worker, good
-        if (len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) < 1) or (len(getAntList(state, 1 - state.whoseTurn, (QUEEN,))) < 1):
-            soldier_part += 6000
-        else: #SOLDIER: go towards the worker but also a bit towards the squeen so it values vertical distance
-            soldier_part = 600-stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (WORKER,))[0].coords)-stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].coords)
-        if (len(getAntList(state, 1 - state.whoseTurn, (WORKER,))) < 1) and (len(getAntList(state, 1 - state.whoseTurn, (QUEEN,))) == 1):
-            soldier_part += 600-stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].coords)
-            #SOLDIER: stay a bit away from the queen
-            #SOLDIER: if you damaged the queen, good
-        if (len(getAntList(state, 1 - state.whoseTurn, (QUEEN,))) == 1):
-            soldier_part +=  (2000-200*getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].health)
-            if (stepsToReach(state, soldier.coords, getAntList(state, 1 - state.whoseTurn, (QUEEN,))[0].coords) < 3):
-                soldier_part = 0
-        else:
-            soldier_part += 6000
-        for drone in getAntList(state, 1 - state.whoseTurn, (DRONE,)):
-            if stepsToReach(state, soldier.coords, drone.coords) < 2:
-                return bad
-    else:
-        soldier_part = 0
-    return (worker_part + soldier_part)
-
-def soldier_utility(state, soldier):
-    pass
+    return 0
 
 
 
 def bestMove(nodes): #find best move in a given list of nodes
-    best_utility = -1 #intitialize at the move that takes 999 moves to win wweeww
+    best_utility = 999 #intitialize at the move that takes 999 moves to win wweeww
     best_move = None
 
     for node in nodes:
@@ -106,7 +111,7 @@ def bestMove(nodes): #find best move in a given list of nodes
         #if (utility > best_utility): # rank their utility and take the best
         #    best_utility = utility
         #    best_move = move
-        if (utility > best_utility): #rank the number of moves to reach goal from moves and take the smallest wweeww
+        if (utility < best_utility): #rank the number of moves to reach goal from moves and take the smallest wweeww
             best_utility = utility
             best_move = node
 
@@ -123,7 +128,7 @@ class AIPlayer(Player):
     ##
 
     def __init__(self, inputPlayerId):
-        super(AIPlayer,self).__init__(inputPlayerId, "soldier_rush")
+        super(AIPlayer,self).__init__(inputPlayerId, "soldier_rush2")
     
     ##
     #getPlacement
